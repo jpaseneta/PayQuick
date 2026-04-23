@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.littlepay.payquick.ui.login.LoginScreen
 import com.littlepay.payquick.ui.login.LoginViewModel
+import com.littlepay.payquick.ui.transactions.TransactionListScreen
 
 @Composable
 fun PayQuickNavGraph(
@@ -29,6 +30,18 @@ fun PayQuickNavGraph(
                     }
                 },
                 viewModel = loginViewModel
+            )
+        }
+        composable(
+            route = "transactions/{token}",
+            arguments = listOf(navArgument("token") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val token = backStackEntry.arguments?.getString("token") ?: ""
+            TransactionListScreen(
+                token = token,
+                onBack = {
+                    navController.popBackStack()
+                }
             )
         }
     }

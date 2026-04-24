@@ -50,6 +50,8 @@ fun LoginScreen(
     val uiState by viewModel.loginState.collectAsState()
 
     //handler for success logic navigation
+    //this removes the flicker effect that happens on a split second
+    //between the login screen and the transaction screen
     LaunchedEffect(uiState) {
         if (uiState is LoginUiState.Success) {
             onLoginSuccess()

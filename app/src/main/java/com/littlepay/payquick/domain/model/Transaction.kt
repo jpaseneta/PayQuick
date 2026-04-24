@@ -1,7 +1,5 @@
 package com.littlepay.payquick.domain.model
 
-import com.google.gson.annotations.SerializedName
-
 data class Transaction(
     val id: String,
     val amountInCents: Long,

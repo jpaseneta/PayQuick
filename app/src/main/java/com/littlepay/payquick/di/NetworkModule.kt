@@ -36,7 +36,7 @@ object NetworkModule {
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("https://payquick-api.example.com/") // Placeholder URL
+            .baseUrl("http://10.0.2.2:3000/") // localhost for emulator
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()

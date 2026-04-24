@@ -1,38 +1,57 @@
 package com.littlepay.payquick.ui.login
 
-import androidx.activity.ComponentActivity
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.littlepay.payquick.R
 import com.littlepay.payquick.ui.theme.PayQuickTheme
 
 @Composable
 fun LoginScreen(
     modifier: Modifier = Modifier,
-    onLoginSuccess: (String) -> Unit,
+    onLoginSuccess: () -> Unit,
     viewModel: LoginViewModel
 ) {
-    val context = LocalContext.current
-    
     val uiState by viewModel.loginState.collectAsState()
 
+    //handler for success logic navigation
+    LaunchedEffect(uiState) {
+        if (uiState is LoginUiState.Success) {
+            onLoginSuccess()
+        }
+    }
+
     LoginContent(
-        modifier = modifier,
+        modifier = modifier.systemBarsPadding(),
         uiState = uiState,
-        onLoginClick = { email, password -> viewModel.login(email, password) },
-        onLoginSuccess = onLoginSuccess
+        onLoginClick = { email, password -> viewModel.login(email, password) }
     )
 }
 
@@ -40,8 +59,7 @@ fun LoginScreen(
 fun LoginContent(
     modifier: Modifier = Modifier,
     uiState: LoginUiState,
-    onLoginClick: (String, String) -> Unit,
-    onLoginSuccess: (String) -> Unit
+    onLoginClick: (String, String) -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -70,7 +88,7 @@ fun LoginContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
-            enabled = uiState !is LoginUiState.Loading
+            enabled = uiState !is LoginUiState.Loading && uiState !is LoginUiState.Success
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -80,16 +98,17 @@ fun LoginContent(
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
-            enabled = uiState !is LoginUiState.Loading
+            enabled = uiState !is LoginUiState.Loading && uiState !is LoginUiState.Success
         )
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = { onLoginClick(email, password) },
             modifier = Modifier.fillMaxWidth(),
-            enabled = uiState !is LoginUiState.Loading && email.isNotBlank() && password.isNotBlank()
+            enabled = (uiState is LoginUiState.Idle || uiState is LoginUiState.Error) &&
+                    email.isNotBlank() && password.isNotBlank()
         ) {
-            if (uiState is LoginUiState.Loading) {
+            if (uiState is LoginUiState.Loading || uiState is LoginUiState.Success) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
                     color = MaterialTheme.colorScheme.onPrimary
@@ -101,7 +120,7 @@ fun LoginContent(
 
         if (uiState is LoginUiState.Error) {
             Text(
-                text = (uiState as LoginUiState.Error).message,
+                text = uiState.message,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -109,12 +128,6 @@ fun LoginContent(
 
         LaunchedEffect(Unit) {
             focusRequester.requestFocus()
-        }
-
-        LaunchedEffect(uiState) {
-            if (uiState is LoginUiState.Success) {
-                onLoginSuccess((uiState as LoginUiState.Success).token)
-            }
         }
     }
 }
@@ -125,8 +138,7 @@ fun LoginScreenPreview() {
     PayQuickTheme {
         LoginContent(
             uiState = LoginUiState.Idle,
-            onLoginClick = { _, _ -> },
-            onLoginSuccess = {}
+            onLoginClick = { _, _ -> }
         )
     }
 }
@@ -137,8 +149,7 @@ fun LoginScreenLoadingPreview() {
     PayQuickTheme {
         LoginContent(
             uiState = LoginUiState.Loading,
-            onLoginClick = { _, _ -> },
-            onLoginSuccess = {}
+            onLoginClick = { _, _ -> }
         )
     }
 }

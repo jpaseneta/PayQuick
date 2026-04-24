@@ -7,7 +7,7 @@ import retrofit2.http.Header
 import retrofit2.http.Query
 
 interface TransactionService {
-    @GET("v1/transactions")
+    @GET("api/v1/transactions")
     suspend fun getTransactions(
         @Header("Authorization") token: String,
         @Query("page") page: Int

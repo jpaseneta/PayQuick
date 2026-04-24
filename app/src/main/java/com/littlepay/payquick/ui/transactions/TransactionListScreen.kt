@@ -1,14 +1,43 @@
 package com.littlepay.payquick.ui.transactions
 
-import androidx.activity.ComponentActivity
-import androidx.compose.foundation.layout.*
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,31 +45,73 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.littlepay.payquick.domain.model.Transaction
 import com.littlepay.payquick.ui.theme.PayQuickTheme
-import java.util.*
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionListScreen(
-    token: String,
-    onBack: () -> Unit
+    viewModel: TransactionViewModel,
+    onLogout: () -> Unit
 ) {
-    val context = LocalContext.current
-    val viewModel: TransactionViewModel = if (context is ComponentActivity) {
-        viewModel(viewModelStoreOwner = context)
-    } else {
-        viewModel()
-    }
-    
     val uiState by viewModel.uiState.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    var showLogoutConfirmation by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    BackHandler(enabled = true) {
+        showLogoutConfirmation = true
+    }
+
+    LaunchedEffect(uiState) {
+        if (uiState is TransactionUiState.AuthError) {
+            Toast.makeText(
+                context,
+                (uiState as TransactionUiState.AuthError).message,
+                Toast.LENGTH_LONG
+            ).show()
+            showLogoutConfirmation = false
+            viewModel.logout()
+            onLogout()
+        }
+    }
+
+
+
+    if (showLogoutConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirmation = false },
+            title = { Text("Logout") },
+            text = { Text("Are you sure you want to logout and exit?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutConfirmation = false
+                        viewModel.logout()
+                        onLogout()
+                    }
+                ) {
+                    Text("Yes")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirmation = false }) {
+                    Text("No")
+                }
+            }
+        )
+    }
 
     TransactionListContent(
         uiState = uiState,
-        onBack = onBack,
-        onLoadMore = { viewModel.loadTransactions(token) },
-        onRetry = { viewModel.loadTransactions(token, isRefresh = true) }
+        isRefreshing = isRefreshing,
+        isLoadingMore = isLoadingMore,
+        onRefresh = { viewModel.loadTransactions(viewModel.getAuthToken(), isRefresh = true) },
+        onConfirmLogout = { showLogoutConfirmation = true },
+        onLoadMore = { viewModel.loadTransactions(viewModel.getAuthToken()) },
+        onRetry = { viewModel.loadTransactions(viewModel.getAuthToken(), isRefresh = true) }
     )
 }
 
@@ -48,7 +119,10 @@ fun TransactionListScreen(
 @Composable
 fun TransactionListContent(
     uiState: TransactionUiState,
-    onBack: () -> Unit,
+    isRefreshing: Boolean,
+    isLoadingMore: Boolean,
+    onRefresh: () -> Unit,
+    onConfirmLogout: () -> Unit,
     onLoadMore: () -> Unit,
     onRetry: () -> Unit
 ) {
@@ -56,11 +130,14 @@ fun TransactionListContent(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Transaction History") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            CenterAlignedTopAppBar(
+                title = { Text("Transaction History", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = onConfirmLogout) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = "Logout"
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -70,54 +147,80 @@ fun TransactionListContent(
             )
         }
     ) { innerPadding ->
-        Box(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (uiState) {
-                is TransactionUiState.Loading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
-                is TransactionUiState.Success -> {
-                    val transactions = uiState.transactions
-                    if (transactions.isEmpty()) {
-                        Text(
-                            text = "No transactions found",
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    } else {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            itemsIndexed(transactions) { index, transaction ->
-                                TransactionItem(transaction)
-                                
-                                if (index == transactions.lastIndex) {
-                                    LaunchedEffect(Unit) {
-                                        onLoadMore()
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (uiState) {
+                    is TransactionUiState.Loading -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+
+                    is TransactionUiState.Success -> {
+                        val transactions = uiState.transactions
+                        if (transactions.isEmpty()) {
+                            Text(
+                                text = "No transactions found",
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        } else {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                itemsIndexed(transactions) { index, transaction ->
+                                    TransactionItem(transaction)
+
+                                    if (index == transactions.lastIndex) {
+                                        LaunchedEffect(Unit) {
+                                            onLoadMore() //load more mechanism
+                                        }
+                                    }
+                                }
+
+                                if (isLoadingMore) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(24.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                is TransactionUiState.Error -> {
-                    Column(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = uiState.message,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                        Button(onClick = onRetry) {
-                            Text("Retry")
+
+                    is TransactionUiState.Error -> {
+                        Column(
+                            modifier = Modifier.align(Alignment.Center),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = uiState.message,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                            Button(onClick = onRetry) {
+                                Text("Retry")
+                            }
                         }
+                    }
+
+                    is TransactionUiState.AuthError -> {
+                        // Handled by LaunchedEffect in TransactionListScreen
                     }
                 }
             }
@@ -151,7 +254,13 @@ fun TransactionItem(transaction: Transaction) {
                 )
             }
             Text(
-                text = "${transaction.currency} ${String.format(Locale.getDefault(), "%.2f", transaction.amountInCents / 100.0)}",
+                text = "${transaction.currency} ${
+                    String.format(
+                        Locale.getDefault(),
+                        "%.2f",
+                        transaction.amountInCents / 100.0
+                    )
+                }",
                 style = MaterialTheme.typography.titleLarge,
                 color = if (transaction.amountInCents < 0) Color.Red else MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -171,7 +280,10 @@ fun TransactionListPreview() {
     PayQuickTheme {
         TransactionListContent(
             uiState = TransactionUiState.Success(mockTransactions),
-            onBack = {},
+            isRefreshing = false,
+            isLoadingMore = false,
+            onRefresh = {},
+            onConfirmLogout = {},
             onLoadMore = {},
             onRetry = {}
         )

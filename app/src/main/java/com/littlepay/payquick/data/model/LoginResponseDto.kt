@@ -12,11 +12,19 @@ data class LoginResponseDto(
 data class LoginDataDto(
     @SerializedName("access_token")
     val accessToken: String,
+    @SerializedName("refresh_token")
+    val refreshToken: String,
+    @SerializedName("expires_in")
+    val expiresIn: Int,
+    @SerializedName("token_type")
+    val tokenType: String,
     val user: UserDto
 )
 
 data class UserDto(
+    @SerializedName("user_id")
     val id: String,
+    @SerializedName("full_name")
     val name: String,
     val email: String
 )

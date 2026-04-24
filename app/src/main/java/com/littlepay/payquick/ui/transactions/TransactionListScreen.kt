@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -49,6 +49,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.littlepay.payquick.domain.model.Transaction
 import com.littlepay.payquick.ui.theme.PayQuickTheme
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -172,18 +174,46 @@ fun TransactionListContent(
                                 modifier = Modifier.align(Alignment.Center)
                             )
                         } else {
+                            val groupedTransactions = remember(transactions) {
+                                transactions.groupBy { transaction ->
+                                    try {
+                                        // takes the first 10 characters from 2025-10-09T10:30:00Z
+                                        // this will be used as key for the grouping
+                                        val date = LocalDate.parse(transaction.date.take(10))
+                                        date.format(
+                                            DateTimeFormatter.ofPattern(
+                                                "MMMM yyyy",
+                                                Locale.getDefault()
+                                            )
+                                        )
+                                    } catch (_: Exception) {
+                                        "Other"
+                                    }
+                                }
+                            }
+
                             LazyColumn(
                                 state = listState,
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                itemsIndexed(transactions) { index, transaction ->
-                                    TransactionItem(transaction)
+                                groupedTransactions.forEach { (month, transactionsInMonth) ->
+                                    item(key = month) {
+                                        Text(
+                                            text = month,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                                        )
+                                    }
+                                    items(transactionsInMonth, key = { it.id }) { transaction ->
+                                        TransactionItem(transaction)
 
-                                    if (index == transactions.lastIndex) {
-                                        LaunchedEffect(Unit) {
-                                            onLoadMore() //load more mechanism
+                                        if (transaction.id == transactions.last().id) {
+                                            LaunchedEffect(Unit) {
+                                                onLoadMore() //load more mechanism
+                                            }
                                         }
                                     }
                                 }

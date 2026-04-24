@@ -42,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -77,8 +79,6 @@ fun TransactionListScreen(
             onLogout()
         }
     }
-
-
 
     if (showLogoutConfirmation) {
         AlertDialog(
@@ -157,7 +157,11 @@ fun TransactionListContent(
             Box(modifier = Modifier.fillMaxSize()) {
                 when (uiState) {
                     is TransactionUiState.Loading -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .semantics { contentDescription = "Loading transactions" }
+                        )
                     }
 
                     is TransactionUiState.Success -> {
@@ -193,7 +197,9 @@ fun TransactionListContent(
                                             contentAlignment = Alignment.Center
                                         ) {
                                             CircularProgressIndicator(
-                                                modifier = Modifier.size(24.dp),
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .semantics { contentDescription = "Loading more transactions" },
                                                 strokeWidth = 2.dp
                                             )
                                         }
@@ -230,8 +236,21 @@ fun TransactionListContent(
 
 @Composable
 fun TransactionItem(transaction: Transaction) {
+    val amountText = "${transaction.currency} ${
+        String.format(
+            Locale.getDefault(),
+            "%.2f",
+            transaction.amountInCents / 100.0
+        )
+    }"
+    val accessibilityLabel = "Transaction: ${transaction.description}, Date: ${transaction.date}, Amount: $amountText"
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                contentDescription = accessibilityLabel
+            },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -254,13 +273,7 @@ fun TransactionItem(transaction: Transaction) {
                 )
             }
             Text(
-                text = "${transaction.currency} ${
-                    String.format(
-                        Locale.getDefault(),
-                        "%.2f",
-                        transaction.amountInCents / 100.0
-                    )
-                }",
+                text = amountText,
                 style = MaterialTheme.typography.titleLarge,
                 color = if (transaction.amountInCents < 0) Color.Red else MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold

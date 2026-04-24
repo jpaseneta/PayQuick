@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -24,9 +26,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -64,6 +72,7 @@ fun LoginContent(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
 
     Column(
         modifier = modifier
@@ -85,10 +94,19 @@ fun LoginContent(
             value = email,
             onValueChange = { email = it },
             label = { Text("Email") },
+            placeholder = { Text("example@domain.com") },
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
-            enabled = uiState !is LoginUiState.Loading && uiState !is LoginUiState.Success
+            enabled = uiState !is LoginUiState.Loading && uiState !is LoginUiState.Success,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+            ),
+            singleLine = true
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -98,20 +116,39 @@ fun LoginContent(
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
-            enabled = uiState !is LoginUiState.Loading && uiState !is LoginUiState.Success
+            enabled = uiState !is LoginUiState.Loading && uiState !is LoginUiState.Success,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    focusManager.clearFocus()
+                    if (email.isNotBlank() && password.isNotBlank()) {
+                        onLoginClick(email, password)
+                    }
+                }
+            ),
+            singleLine = true
         )
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = { onLoginClick(email, password) },
+            onClick = {
+                focusManager.clearFocus()
+                onLoginClick(email, password)
+            },
             modifier = Modifier.fillMaxWidth(),
             enabled = (uiState is LoginUiState.Idle || uiState is LoginUiState.Error) &&
                     email.isNotBlank() && password.isNotBlank()
         ) {
             if (uiState is LoginUiState.Loading || uiState is LoginUiState.Success) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
+                    modifier = Modifier
+                        .size(24.dp)
+                        .semantics { contentDescription = "Logging in..." },
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
                 )
             } else {
                 Text("Login")
@@ -122,7 +159,9 @@ fun LoginContent(
             Text(
                 text = uiState.message,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .semantics { contentDescription = "Login error: ${uiState.message}" }
             )
         }
 
